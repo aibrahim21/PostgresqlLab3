@@ -1,0 +1,248 @@
+#1
+CREATE FUNCTION multiply_numbers(a integer, b integer)
+RETURNS integer AS $$
+BEGIN
+    RETURN a * b;
+END;
+$$ LANGUAGE plpgsql;
+CREATE FUNCTION
+
+
+#function call 
+
+
+postgres=# SELECT multiply_numbers(4, 6);
+ multiply_numbers 
+------------------
+               24
+(1 row)
+
+==============================
+
+#2 
+
+
+          ^
+postgres=# CREATE FUNCTION hello_user(name text)
+postgres-# RETURNS text AS $$
+postgres$# BEGIN 
+postgres$# RETURN 'Hello, ' || name;
+postgres$# END;
+postgres$# $$ LANGUAGE plpgsql;
+CREATE FUNCTION
+postgres=# SELECT hello_user('Amira');
+  hello_user  
+--------------
+ Hello, Amira
+(1 row)
+
+postgres=# 
+
+======================
+#3
+
+
+postgres=# CREATE FUNCTION odd_even(num integer) 
+RETURNS text AS $$
+BEGIN 
+    IF num % 2 = 0 THEN 
+        RETURN 'EVEN';
+    ELSE 
+        RETURN 'ODD';
+    END IF;
+END;
+$$ LANGUAGE plpgsql;
+CREATE FUNCTION
+postgres=# SELECT odd_even(4);
+ odd_even 
+----------
+ EVEN
+(1 row)
+
+postgres=# SELECT odd_even(3);
+ odd_even 
+----------
+ ODD
+(1 row)
+
+================================
+#4 
+testdb=# CREATE FUNCTION student_info (stu_id integer) 
+testdb-# RETURNS SETOF student AS $$
+testdb$# BEGIN 
+testdb$# RETURN QUERY 
+testdb$# SELECT * FROM STUDENT WHERE stuid = stu_id;
+testdb$# END;
+testdb$# $$ LANGUAGE plpgsql;
+CREATE FUNCTION
+testdb=# SELECT student_info(1);
+                    student_info                    
+----------------------------------------------------
+ (1,amira@nice.com,Abnub,1,Amira,2002-08-15,female)
+(1 row)
+
+testdb=# SELECT student_info(2);
+                   student_info                    
+---------------------------------------------------
+ (2,lola@nice.com,assuit,2,lola,2004-03-05,female)
+(1 row)
+
+testdb=# 
+
+==================================
+#5
+testdb=# CREATE VIEW student_grade AS 
+SELECT student.e_name AS student_name, AVG(grades.grade) AS average_grade , subject.sub_name AS subject_name 
+FROM student
+JOIN stu_sub ON student.stuid = stu_sub.stu_id
+ JOIN subject ON subject.subjectid = stu_sub.sub_id   
+JOIN grades ON stu_sub.sub_id = grades.sub_id
+GROUP BY student.stuid , subject.sub_name ;
+CREATE VIEW
+testdb=# SELECT * FROM student_grade;
+ student_name |    average_grade    |  subject_name   
+--------------+---------------------+-----------------
+ Amira        | 86.7500000000000000 | problem solving
+ lily         | 79.2500000000000000 | Algorithms
+ lola         | 91.1250000000000000 | Clean code
+(3 rows)
+
+testdb=# CREATE FUNCTION get_avg (subject text ) RETURNS SETOF student_grade AS $$
+testdb$# BEGIN
+testdb$# RETURN QUERY 
+testdb$# SELECT * FROM student_grade WHERE subject_name = subject ;
+testdb$# END;
+testdb$# $$ LANGUAGE plpgsql;
+CREATE FUNCTION
+
+
+testdb=# SELECT get_avg('problem solving');
+                    get_avg                    
+-----------------------------------------------
+ (Amira,86.7500000000000000,"problem solving")
+(1 row)
+
+testdb=# 
+
+=======================================================
+
+#7 
+we need too create logs 
+then functon 
+then triger to run the function 
+
+
+
+testdb=# CREATE TABLE track_student (
+testdb(# action_id serial PRIMARY KEY,
+testdb(# stu_id int,
+testdb(# action_time timestamp DEFAULT now(),
+testdb(# action text,
+testdb(# description text );
+CREATE TABLE
+testdb=# /d track_student
+testdb-# ;
+ERROR:  syntax error at or near "/"
+LINE 1: /d track_student
+        ^
+testdb=# \d track_student
+testdb=# CREATE OR REPLACE FUNCTION track_student_fun() RETURNS trigger AS $$
+testdb$# BEGIN 
+testdb$# IF TG_OP = 'INSERT' THEN 
+testdb$# INSERT INTO track_student (stu_id,action,description ) 
+testdb$# VALUES (NEW.stu_id ,'INSERT' , 'inserted student :' || NEW.e_name);
+testdb$# ELSIF TG_OP = 'UPDATE' THEN 
+testdb$# INSERT INTO track_student (stu_id ,action , description) 
+testdb$# VALUES (NEW.stu_id ,'UPDATE' , 'Deleted student: ' || OLD.e_name);
+testdb$# ELSIF TG_OP = 'DELETE' THEN 
+testdb$# INSERT INTO track_student (stu_id. action , description )
+testdb$# VALUES (OLD.stu_id, 'DELETE' , 'Deleted student :' || OLD.e_name);
+testdb$# END IF;
+testdb$# RETURN NULL; 
+testdb$# END; 
+testdb$# $$ LANGUAGE plpgsql;
+CREATE FUNCTION
+testdb=# CREATE TRIGGER student_log_trigger 
+testdb-# AFTERB INSERT OR UPDATE OR DELETE ON STUDENT 
+testdb-# FOR EACH ROW 
+testdb-# EXECUTE FUNCTION track_student_fun();
+ERROR:  syntax error at or near "AFTERB"
+LINE 2: AFTERB INSERT OR UPDATE OR DELETE ON STUDENT 
+        ^
+testdb=# CREATE TRIGGER student_log_trigger
+testdb-# AFTER INSERT OR UPDATE OR DELETE ON student
+testdb-# FOR EACH ROW
+testdb-# EXECUTE FUNCTION track_student_fun();
+CREATE TRIGGER
+testdb=# INSERT INTO student (stu_id, e_name) VALUES (1, 'John Doe');
+ERROR:  column "stu_id" of relation "student" does not exist
+LINE 1: INSERT INTO student (stu_id, e_name) VALUES (1, 'John Doe');
+                             ^
+testdb=# SELECT * FROM student;
+ stuid |        email         | address | trackid |  e_name  | birthdate  | gender 
+-------+----------------------+---------+---------+----------+------------+--------
+     1 | amira@nice.com       | Abnub   |       1 | Amira    | 2002-08-15 | female
+     2 | lola@nice.com        | assuit  |       2 | lola     | 2004-03-05 | female
+     3 | lily@nice.com        | cairo   |       3 | lily     | 1999-11-01 | female
+     4 | mohammed@student.com | london  |       1 | Mohammed | 1990-03-25 | male
+     5 | mohammed@student.com | london  |       1 | Mohammed | 1990-03-25 | male
+     6 | mohammed@student.com | london  |       1 | Mohammed | 1990-03-25 | male
+(6 rows)
+
+testdb=#  INSERT INTO student (stuid , e_name) VALUES (7 , 'lila');
+
+ERROR:  record "new" has no field "stu_id"
+CONTEXT:  SQL statement "INSERT INTO track_student (stu_id,action,description ) 
+VALUES (NEW.stu_id ,'INSERT' , 'inserted student :' || NEW.e_name)"
+PL/pgSQL function track_student_fun() line 4 at SQL statement
+testdb=# CREATE OR REPLACE FUNCTION track_student_fun() RETURNS trigger AS $$
+BEGIN 
+    IF TG_OP = 'INSERT' THEN 
+        INSERT INTO track_student (stu_id, action, description) 
+        VALUES (NEW.stuid, 'INSERT', 'Inserted student: ' || NEW.e_name);
+
+    ELSIF TG_OP = 'UPDATE' THEN 
+        INSERT INTO track_student (stu_id, action, description) 
+        VALUES (NEW.stuid, 'UPDATE', 'Updated student: ' || OLD.e_name);
+
+    ELSIF TG_OP = 'DELETE' THEN 
+        INSERT INTO track_student (stu_id, action, description)
+        VALUES (OLD.stuid, 'DELETE', 'Deleted student: ' || OLD.e_name);
+    END IF;
+
+    RETURN NULL;
+END; 
+$$ LANGUAGE plpgsql;
+CREATE FUNCTION
+testdb=#   INSERT INTO student (stuid , e_name) VALUES (7 , 'lila');
+INSERT 0 1
+testdb=# UPDATE student SET e_name = 'fatma' WHERE stu_id =3;
+ERROR:  column "stu_id" does not exist
+LINE 1: UPDATE student SET e_name = 'fatma' WHERE stu_id =3;
+                                                  ^
+HINT:  Perhaps you meant to reference the column "student.stuid".
+testdb=# 
+testdb=# UPDATE student SET e_name = 'fatma' WHERE stuid = 3;
+UPDATE 1
+testdb=# DELETE FROM student WHERE stu_id = 1;
+ERROR:  column "stu_id" does not exist
+LINE 1: DELETE FROM student WHERE stu_id = 1;
+                                  ^
+HINT:  Perhaps you meant to reference the column "student.stuid".
+testdb=# DELETE FROM student WHERE stuid = 1;
+ERROR:  update or delete on table "student" violates foreign key constraint "stu_sub_stu_id_fkey" on table "stu_sub"
+DETAIL:  Key (stuid)=(1) is still referenced from table "stu_sub".
+testdb=# DELETE FROM student WHERE stu_id = 1;
+ERROR:  column "stu_id" does not exist
+LINE 1: DELETE FROM student WHERE stu_id = 1;
+                                  ^
+HINT:  Perhaps you meant to reference the column "student.stuid".
+testdb=# SELECT * FROM track_student;
+ action_id | stu_id |        action_time         | action |      description       
+-----------+--------+----------------------------+--------+------------------------
+         1 |      7 | 2025-05-01 16:37:22.935468 | INSERT | Inserted student: lila
+         2 |      3 | 2025-05-01 16:39:24.181133 | UPDATE | Updated student: lily
+(2 rows)
+
+testdb=# 
+
